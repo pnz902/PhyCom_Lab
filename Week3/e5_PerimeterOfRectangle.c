@@ -1,12 +1,9 @@
 #include <stdio.h>
 
 int main(){
-	double n1, n2;
-    scanf("%lf,%lf", &n1, &n2);
-    printf("The sum of the given numbers : %lf\n", n1+n2);
-    printf("The difference of the given numbers : %lf\n", n1-n2);
-    printf("The product of the given numbers : %lf\n", n1*n2);
-    printf("The quotient of the given numbers : %lf", n1/n2);
+	double width, length;
+    scanf("%lf\n%lf", &width, &length);
+    printf("Perimeter of rectangle = %.4lf units", (2*width) + (2*length));
     
 	return 0;
 }
