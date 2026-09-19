@@ -125,33 +125,24 @@ void delete(struct SinglyLinkedList* list, char* data) {
     struct DataNode* current = list->head;
     struct DataNode* previous = NULL;
 
-    if(list->head->data == data){
-        list->head = list->head->next;
-    } else{
+    while(current != NULL){
+        if (strcmp(current->data, data) == 0){
+            if(current == list->head){
+                list->head = current->next;
+            } else if(current->next == NULL) {
+                previous->next = NULL;
+            } else {
+                previous->next = current->next;
+            }
+            free(current->data);
+            free(current);
+            list->count--;
+            return;
+        }
         previous = current;
         current = current->next;
-        while(1){
-            if (current == NULL){
-                printf("Cannot delete, <data> does not exist.");
-                break;
-            }else if(current->next->data == data){
-                if(current->next == NULL){
-                    previous->next = NULL;
-                } else {
-                    previous->next = current->next;
-                }
-                list->count--;
-                break;
-            }
-            previous = previous->next;
-            current = current->next;
-        }
-
     }
-    
-    free(current->data);
-    free(current);
-    free(previous->data);
-    free(previous);
+
+    printf("Cannot delete, %s does not exist.\n", data);
 
 }
