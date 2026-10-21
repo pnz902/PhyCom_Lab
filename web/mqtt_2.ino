@@ -1,122 +1,102 @@
-/*
- *
- * This Arduino UNO R4 code is made available for public use without any restriction
- *
- */
-
 #include <WiFiS3.h>
 #include <MQTTClient.h>
 
-const char WIFI_SSID[] = "ITFORGE_UFOxL";           // CHANGE TO YOUR WIFI SSID
-const char WIFI_PASSWORD[] = "Ahhhhhhh";  // CHANGE TO YOUR WIFI PASSWORD
+const char WIFI_SSID[] = "ITFORGE_UFOxL";       // CHANGE TO YOUR WIFI SSID
+const char WIFI_PASSWORD[] = "Ahhhhhhh";       // CHANGE TO YOUR WIFI PASSWORD
 
-const char MQTT_BROKER_ADRRESS[] = "mqtt-dashboard.com";  // CHANGE TO MQTT BROKER'S ADDRESS
-//const char MQTT_BROKER_ADRRESS[] = "192.168.0.11";  // CHANGE TO MQTT BROKER'S IP ADDRESS
+const char MQTT_BROKER_ADRRESS[] = "mqtt-dashboard.com"; 
 const int MQTT_PORT = 1883;
-const char MQTT_CLIENT_ID[] = "arduino-uno-r4-ananya";  // CHANGE IT AS YOU DESIRE
-const char MQTT_USERNAME[] = "";                        // CHANGE IT IF REQUIRED, empty if not required
-const char MQTT_PASSWORD[] = "";                        // CHANGE IT IF REQUIRED, empty if not required
+const char MQTT_CLIENT_ID[] = "arduino-uno-r4-ananya"; 
+const char MQTT_USERNAME[] = "";                
+const char MQTT_PASSWORD[] = "";                
 
-// The MQTT topics that Arduino should publish/subscribe
-const char PUBLISH_TOPIC[] = "ananya/temp";  // CHANGE IT AS YOU DESIRE
-
-const int PUBLISH_INTERVAL = 5000;  // 5 seconds
+const char PUBLISH_TOPIC[] = "ananya/temp"; 
 
 WiFiClient network;
 MQTTClient mqtt = MQTTClient(256);
 
-unsigned long lastPublishTime = 0;
+const int colPins[4] = {5, 4, 3, 2};
+const int rowPins[4] = {9, 8, 7, 6};
+
+const char keys[4][4] = {
+  {'1', '2', '3', 'A'},
+  {'4', '5', '6', 'B'},
+  {'7', '8', '9', 'C'},
+  {'*', '0', '#', 'D'}
+};
 
 void setup() {
   Serial.begin(9600);
 
+  for (int c = 0; c < 4; c++) {
+    pinMode(colPins[c], INPUT_PULLUP);
+  }
+  
+  for (int r = 0; r < 4; r++) {
+    pinMode(rowPins[r], OUTPUT);
+    digitalWrite(rowPins[r], HIGH);
+  }
+
   int status = WL_IDLE_STATUS;
   while (status != WL_CONNECTED) {
-    Serial.print("Arduino UNO R4 - Attempting to connect to SSID: ");
+    Serial.print("Attempting to connect to SSID: ");
     Serial.println(WIFI_SSID);
-    // Connect to WPA/WPA2 network. Change this line if using open or WEP network:
     status = WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
-    // wait 10 seconds for connection:
     delay(10000);
   }
-  // print your board's IP address:
+
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
 
+  // Initialize MQTT driver once in setup
+  mqtt.begin(MQTT_BROKER_ADRRESS, MQTT_PORT, network);
   connectToMQTT();
 }
 
 void loop() {
+  // Auto-reconnect if connection drops
+  if (!mqtt.connected()) {
+    connectToMQTT();
+  }
   mqtt.loop();
 
-  if (millis() - lastPublishTime > PUBLISH_INTERVAL) {
-    sendPotentiometerData();
-    lastPublishTime = millis();
+  // Scan Keypad
+  for (int r = 0; r < 4; r++) {
+    digitalWrite(rowPins[r], LOW); // Activate active row
+
+    for (int c = 0; c < 4; c++) {
+      if (digitalRead(colPins[c]) == LOW) {
+        char input = keys[r][c];
+        sendNum(input);
+
+        delay(50); // Debounce delay
+
+        // Wait until key is released so we only publish once per press
+        while (digitalRead(colPins[c]) == LOW) {
+          mqtt.loop();
+        }
+      }   
+    }
+
+    digitalWrite(rowPins[r], HIGH); // Deactivate row before checking next row
   }
 }
 
 void connectToMQTT() {
-  // Connect to the MQTT broker
-  mqtt.begin(MQTT_BROKER_ADRRESS, MQTT_PORT, network);
+  if (mqtt.connected()) return;
 
-  // Create a handler for incoming messages
-  mqtt.onMessage(messageReceived);
-
-  Serial.print("Arduino UNO R4 - Connecting to MQTT broker");
-
+  Serial.print("Connecting to MQTT broker");
   while (!mqtt.connect(MQTT_CLIENT_ID, MQTT_USERNAME, MQTT_PASSWORD)) {
     Serial.print(".");
-    delay(100);
+    delay(1000); // Retry every 1s instead of 0.1s
   }
-  Serial.println();
-
-  if (!mqtt.connected()) {
-    Serial.println("Arduino UNO R4 - MQTT broker Timeout!");
-    return;
-  }
-
-  // Subscribe to a topic, the incoming messages are processed by messageHandler() function
-  // if (mqtt.subscribe(SUBSCRIBE_TOPIC))
-  //   Serial.print("Arduino UNO R4 - Subscribed to the topic: ");
-  // else
-  //   Serial.print("Arduino UNO R4 - Failed to subscribe to the topic: ");
-
-  // Serial.println(SUBSCRIBE_TOPIC);
-  // Serial.println("Arduino UNO R4 - MQTT broker Connected!");
+  Serial.println("\nMQTT Connected!");
 }
 
-void sendPotentiometerData() {
-  int val = analogRead(A0);
+void sendNum(char key) {
+  String payload = String(key);
+  mqtt.publish(PUBLISH_TOPIC, payload);
 
-  String payload = String(val);
-  mqtt.publish(ananya/temp, payload);
-
-  Serial.print("Potentiometer Value: ");
-  Serial.print(payload);
+  Serial.print("Key Pressed & Published: ");
+  Serial.println(payload);
 }
-
-// void messageReceived(String &topic, String &payload) {
-//   Serial.println("Arduino UNO R4 - received from MQTT:");
-//   Serial.println("- topic: " + topic);
-//   Serial.println("- payload:");
-//   Serial.println(payload);
-
-//   int anode = 0, r = 0, g = 0, b = 0;
-//   sscanf(payload.c_str(), "%d,%d,%d,%d", &anode, &r, &g, &b);
-
-//   analogWrite(9, anode * 2.55);
-//   analogWrite(RED_PIN, 255 - (r * 2.55));
-//   analogWrite(GREEN_PIN, 255 - (g * 2.55));
-//   analogWrite(BLUE_PIN, 255 - (b * 2.55));
-
-//   Serial.print("Anode: "); Serial.println(anode);
-//   Serial.print("R: "); Serial.print(r);
-//   Serial.print(" G: "); Serial.print(g);
-//   Serial.print(" B: "); Serial.println(b);
-
-//   // You can process the incoming data , then control something
-//   /*
-//   process something
-//   */
-// }
